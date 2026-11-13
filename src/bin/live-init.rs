@@ -67,11 +67,11 @@ fn find_medium() -> Option<String> {
 /// Attach `file` to a free loop device and return its path.
 fn loop_attach(file: &str) -> Option<String> {
     use std::os::fd::AsRawFd;
-    const LOOP_CTL_GET_FREE: i32 = 0x4C82;
-    const LOOP_SET_FD: i32 = 0x4C00;
+    const LOOP_CTL_GET_FREE: u32 = 0x4C82;
+    const LOOP_SET_FD: u32 = 0x4C00;
     let ctl = std::fs::OpenOptions::new().read(true).write(true).open("/dev/loop-control").ok()?;
     // SAFETY: the ioctl takes no pointer
-    let n = unsafe { libc::ioctl(ctl.as_raw_fd(), LOOP_CTL_GET_FREE) };
+    let n = unsafe { libc::ioctl(ctl.as_raw_fd(), LOOP_CTL_GET_FREE as _) };
     if n < 0 {
         return None;
     }
@@ -83,7 +83,24 @@ fn loop_attach(file: &str) -> Option<String> {
     let dev = std::fs::OpenOptions::new().read(true).write(true).open(&path).ok()?;
     let f = std::fs::File::open(file).ok()?;
     // SAFETY: the argument is a file descriptor that stays open for the call
-    (unsafe { libc::ioctl(dev.as_raw_fd(), LOOP_SET_FD, f.as_raw_fd()) } == 0).then_some(path)
+    (unsafe { libc::ioctl(dev.as_raw_fd(), LOOP_SET_FD as _, f.as_raw_fd()) } == 0).then_some(path)
+}
+
+/// What makes the system live, in the writable layer above the read-only image: root without a
+/// password, a hostname of its own, an issue that points at the guide. The image stays the system
+/// that is installed.
+fn live_settings() {
+    use std::os::unix::fs::PermissionsExt;
+    for (name, text, mode) in [
+        ("shadow", include_str!("../../data/live/shadow"), 0o600),
+        ("hostname", include_str!("../../data/live/hostname"), 0o644),
+        ("issue", include_str!("../../data/live/issue"), 0o644),
+    ] {
+        let path = format!("/rw/up/etc/{name}");
+        if std::fs::write(&path, text).is_ok() {
+            let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode));
+        }
+    }
 }
 
 fn main() {
@@ -101,8 +118,9 @@ fn main() {
     if !mount("tmpfs", "/rw", "tmpfs", 0, "mode=755") {
         die("cannot mount a tmpfs");
     }
-    let _ = std::fs::create_dir_all("/rw/up");
+    let _ = std::fs::create_dir_all("/rw/up/etc");
     let _ = std::fs::create_dir_all("/rw/work");
+    live_settings();
     if !mount("overlay", "/newroot", "overlay", 0, "lowerdir=/ro,upperdir=/rw/up,workdir=/rw/work") {
         die("cannot mount the overlay");
     }
