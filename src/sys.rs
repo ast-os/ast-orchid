@@ -59,34 +59,84 @@ pub fn kill(pid: i32, sig: i32) {
     unsafe { libc::kill(pid, sig) };
 }
 
-/// Signals orchid answers; they are blocked so that they can be waited for.
-pub const SIGNALS: [i32; 5] = [libc::SIGCHLD, libc::SIGTERM, libc::SIGINT, libc::SIGUSR1, libc::SIGUSR2];
+/// Signals orchid answers.
+const SIGNALS: [i32; 5] = [libc::SIGCHLD, libc::SIGTERM, libc::SIGINT, libc::SIGUSR1, libc::SIGUSR2];
 
-fn sigset() -> libc::sigset_t {
-    // SAFETY: the set is initialised by sigemptyset before use
-    unsafe {
-        let mut set = std::mem::zeroed();
-        libc::sigemptyset(&mut set);
-        for s in SIGNALS {
-            libc::sigaddset(&mut set, s);
+/// The signals above, blocked and delivered through a file descriptor so that they can be waited
+/// for together with the control socket.
+pub struct SignalFd(i32);
+
+impl SignalFd {
+    pub fn new() -> SignalFd {
+        // SAFETY: the set is initialised by sigemptyset before use
+        let fd = unsafe {
+            let mut set: libc::sigset_t = std::mem::zeroed();
+            libc::sigemptyset(&mut set);
+            for s in SIGNALS {
+                libc::sigaddset(&mut set, s);
+            }
+            libc::pthread_sigmask(libc::SIG_BLOCK, &set, std::ptr::null_mut());
+            libc::signalfd(-1, &set, libc::SFD_CLOEXEC | libc::SFD_NONBLOCK)
+        };
+        SignalFd(fd)
+    }
+
+    pub fn fd(&self) -> i32 {
+        self.0
+    }
+
+    /// The signals that arrived.
+    pub fn read(&self) -> Vec<i32> {
+        let size = std::mem::size_of::<libc::signalfd_siginfo>();
+        let mut out = Vec::new();
+        loop {
+            // SAFETY: `info` is a plain struct of `size` bytes
+            let mut info: libc::signalfd_siginfo = unsafe { std::mem::zeroed() };
+            let n = unsafe { libc::read(self.0, (&mut info as *mut libc::signalfd_siginfo).cast(), size) };
+            if n != size as isize {
+                return out;
+            }
+            out.push(info.ssi_signo as i32);
         }
-        set
     }
 }
 
-pub fn block_signals() {
-    let set = sigset();
-    // SAFETY: `set` is valid
-    unsafe { libc::pthread_sigmask(libc::SIG_BLOCK, &set, std::ptr::null_mut()) };
+/// Wait up to `ms` for any of the descriptors to be readable; which ones are.
+pub fn poll(fds: &[i32], ms: i32) -> Vec<bool> {
+    let mut v: Vec<libc::pollfd> = fds.iter().map(|&fd| libc::pollfd { fd, events: libc::POLLIN, revents: 0 }).collect();
+    // SAFETY: `v` is a valid array of pollfd
+    unsafe { libc::poll(v.as_mut_ptr(), v.len() as libc::nfds_t, ms) };
+    v.iter().map(|p| p.revents & libc::POLLIN != 0).collect()
 }
 
-/// Wait up to `ms` for one of the signals; `None` on timeout.
-pub fn wait_signal(ms: i64) -> Option<i32> {
-    let set = sigset();
-    let ts = libc::timespec { tv_sec: ms / 1000, tv_nsec: (ms % 1000) * 1_000_000 };
-    // SAFETY: `set` and `ts` are valid
-    let s = unsafe { libc::sigtimedwait(&set, std::ptr::null_mut(), &ts) };
-    (s > 0).then_some(s)
+/// The user id of the process at the other end of a Unix socket.
+pub fn peer_uid(fd: i32) -> Option<u32> {
+    // SAFETY: `cred` is a plain struct and `len` its size
+    let mut cred: libc::ucred = unsafe { std::mem::zeroed() };
+    let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+    let r = unsafe { libc::getsockopt(fd, libc::SOL_SOCKET, libc::SO_PEERCRED, (&mut cred as *mut libc::ucred).cast(), &mut len) };
+    (r == 0).then_some(cred.uid)
+}
+
+/// The numeric ids of a user and a group named in a service file.
+pub fn ids(user: Option<&str>, group: Option<&str>) -> Result<(Option<u32>, Option<u32>), String> {
+    let find = |file: &str, name: &str, field: usize| -> Result<u32, String> {
+        let text = std::fs::read_to_string(file).map_err(|e| format!("cannot read {file}: {e}"))?;
+        text.lines()
+            .filter_map(|l| {
+                let f: Vec<&str> = l.split(':').collect();
+                (f.first() == Some(&name)).then(|| f.get(field).and_then(|v| v.parse().ok())).flatten()
+            })
+            .next()
+            .ok_or_else(|| format!("no such {} {name:?}", if file.ends_with("passwd") { "user" } else { "group" }))
+    };
+    let uid = user.map(|u| u.parse().or_else(|_| find("/etc/passwd", u, 2))).transpose()?;
+    let gid = match (group, user) {
+        (Some(g), _) => Some(g.parse().or_else(|_| find("/etc/group", g, 2))?),
+        (None, Some(u)) => Some(find("/etc/passwd", u, 3).or_else(|e| u.parse().map_err(|_| e))?),
+        _ => None,
+    };
+    Ok((uid, gid))
 }
 
 /// A finished child, if any: `(pid, exit code or 128 + signal)`.

@@ -13,7 +13,7 @@ fn line(marker: char, text: &str) {
 
 pub fn banner() {
     let mut out = std::io::stdout().lock();
-    let _ = write!(out, "{BANNER}\n");
+    let _ = writeln!(out, "{BANNER}");
     let _ = out.flush();
 }
 
