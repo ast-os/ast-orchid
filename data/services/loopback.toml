@@ -1,0 +1,4 @@
+[service]
+description = "bring up the loopback interface"
+exec = ["/usr/sbin/ip", "link", "set", "lo", "up"]
+type = "oneshot"
