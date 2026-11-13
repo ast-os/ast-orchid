@@ -17,6 +17,7 @@ orchid list                      the services: state, whether they start at boot
 orchid status NAME               everything about one service
 orchid start | stop | restart NAME...
 orchid enable | disable NAME...  start at boot, or not
+orchid kill NAME [SIGNAL]       signal every process of a service (default TERM)
 orchid reload                    read the service files again
 orchid log NAME [LINES]          the end of a service's log
 orchid reboot | poweroff | halt  take the system down (also as links named reboot, poweroff, halt)
@@ -43,17 +44,39 @@ One TOML file per service in `/etc/orchid/services`, started at boot when linked
 [service]
 description = "secure shell"
 exec = ["/usr/sbin/sshd", "-D"]
-type = "daemon"                # daemon (default), or oneshot: what needs it waits until it has finished
+type = "daemon"                # daemon (default, stays in the foreground), oneshot (what needs it waits until it has finished) or forking (starts a daemon that leaves: up while its control group has processes)
 needs = ["network"]            # started first; if it fails, this one is skipped
 wants = ["log"]                # started first if it exists, no more
 after = ["clock"]              # only the order
 restart = "on-failure"         # no (default), on-failure or always; five restarts in 30 s, then it gives up
 user = "sshd"                  # a name or a number, with group = "..." (default: the user's own)
 workdir = "/"
-output = "file"                # file (default for daemons: /var/log/orchid/NAME.log) or console (default for oneshots)
+output = "file"                # file (default for daemons: /var/log/orchid/NAME.log), console (default for oneshots) or tty (the console is its terminal)
 timeout = 5                    # seconds a stopping service gets before it is killed
+stop = ["/usr/bin/sshd-save"]  # run when it is stopped, before it is signalled (a oneshot that is done: when it is stopped)
+modes = ["normal"]             # the boot modes it belongs to: normal, rescue
 env = { LANG = "C" }
 ```
+
+## What the system does for a service
+
+- **Control groups.** Every service runs in its own cgroup v2 (`/sys/fs/cgroup/orchid/NAME`). `stop`
+  and `kill` reach everything the service started, and what a service leaves behind when it ends is
+  killed with it. `status` shows how many processes it has.
+- **Logs.** What a service prints goes through PID 1 to `/var/log/orchid/NAME.log`, every line with
+  the time. A log that would pass 1 MiB is rotated (`.log.1` to `.log.5`).
+- **Consoles.** The kernel can have several (`console=tty0 console=ttyS0`); orchid writes to every
+  active one, so the screen and the serial line both show the boot.
+- **Boot modes.** `rescue` (or `single`) on the kernel command line starts only the services that
+  list `rescue` in `modes`. A service with `output = "tty"` gets the console as its terminal.
+
+## Services of orchid itself
+
+`fsck` (the file systems, the root while it is read-only), `rootfs` (made read-write), `mounts`,
+`loopback`, `efivars`, `random-seed` (restored at boot, saved at shutdown), `hwclock` (set the time,
+save it at shutdown), `sysctl`, `swap` and `rescue-shell`. The others come with the package of the
+daemon they start: `udevd` with eudev, `agetty-*` with util-linux, `syslogd` with sysklogd, `dhcpcd`
+with dhcpcd.
 
 ## Test
 

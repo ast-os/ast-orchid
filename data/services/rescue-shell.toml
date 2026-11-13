@@ -1,0 +1,8 @@
+[service]
+description = "a root shell on the console, for repairs (boot with rescue or single)"
+exec = ["/usr/sbin/sulogin"]
+needs = ["mounts"]
+type = "daemon"
+restart = "always"
+output = "tty"
+modes = ["rescue"]

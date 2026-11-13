@@ -4,3 +4,4 @@ exec = ["/usr/bin/mount", "-a"]
 needs = ["rootfs"]
 after = ["udev-settle"]
 type = "oneshot"
+modes = ["normal", "rescue"]

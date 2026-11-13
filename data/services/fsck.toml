@@ -1,0 +1,5 @@
+[service]
+description = "check the file systems of /etc/fstab, the root while it is still read-only"
+exec = ["/bin/sh", "-c", "fsck -A -a -T; [ $? -lt 4 ]"]
+type = "oneshot"
+modes = ["normal", "rescue"]

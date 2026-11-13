@@ -150,3 +150,55 @@ pub fn reap() -> Option<(i32, i32)> {
     let code = if libc::WIFEXITED(status) { libc::WEXITSTATUS(status) } else { 128 + libc::WTERMSIG(status) };
     Some((pid, code))
 }
+
+/// The control groups of the services: one directory per service in the unified hierarchy, so
+/// that everything a service starts can be found, signalled and killed with it.
+pub mod cgroup {
+    use std::path::PathBuf;
+
+    const ROOT: &str = "/sys/fs/cgroup/orchid";
+
+    /// Make the directory for the services; false when there is no cgroup v2.
+    pub fn init() -> bool {
+        let _ = std::fs::create_dir_all(ROOT);
+        std::path::Path::new(ROOT).join("cgroup.procs").exists()
+    }
+
+    pub fn dir(name: &str) -> PathBuf {
+        PathBuf::from(ROOT).join(name)
+    }
+
+    pub fn create(name: &str) -> Option<PathBuf> {
+        let d = dir(name);
+        std::fs::create_dir_all(&d).ok()?;
+        Some(d.join("cgroup.procs"))
+    }
+
+    pub fn procs(name: &str) -> Vec<i32> {
+        std::fs::read_to_string(dir(name).join("cgroup.procs")).unwrap_or_default().lines().filter_map(|l| l.trim().parse().ok()).collect()
+    }
+
+    pub fn populated(name: &str) -> bool {
+        std::fs::read_to_string(dir(name).join("cgroup.events")).is_ok_and(|t| t.lines().any(|l| l == "populated 1"))
+    }
+
+    /// Signal every process of the service.
+    pub fn signal(name: &str, sig: i32) {
+        for p in procs(name) {
+            super::kill(p, sig);
+        }
+    }
+
+    /// Kill every process of the service at once.
+    pub fn kill(name: &str) {
+        if std::fs::write(dir(name).join("cgroup.kill"), "1").is_err() {
+            signal(name, libc::SIGKILL);
+        }
+    }
+
+    /// Kill what is left in the service's group, then remove the group.
+    pub fn clear(name: &str) {
+        kill(name);
+        let _ = std::fs::remove_dir(dir(name));
+    }
+}

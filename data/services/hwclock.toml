@@ -1,0 +1,6 @@
+[service]
+description = "set the system time from the hardware clock, and the other way at shutdown"
+exec = ["/bin/sh", "-c", "[ ! -e /dev/rtc0 ] || hwclock --hctosys --utc"]
+stop = ["/bin/sh", "-c", "[ ! -e /dev/rtc0 ] || hwclock --systohc --utc"]
+after = ["udev-settle"]
+type = "oneshot"

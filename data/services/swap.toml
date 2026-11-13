@@ -1,0 +1,6 @@
+[service]
+description = "turn on the swap of /etc/fstab, and off at shutdown"
+exec = ["/usr/sbin/swapon", "--all"]
+stop = ["/usr/sbin/swapoff", "--all"]
+needs = ["mounts"]
+type = "oneshot"

@@ -32,15 +32,26 @@ struct RawService {
     env: BTreeMap<String, String>,
     output: Option<Output>,
     timeout: Option<u64>,
+    #[serde(default)]
+    stop: Vec<String>,
+    #[serde(default = "normal")]
+    modes: Vec<String>,
 }
 
-/// `daemon` keeps running; `oneshot` must finish before whatever needs it starts.
+fn normal() -> Vec<String> {
+    vec!["normal".into()]
+}
+
+/// `daemon` keeps running in the foreground; `oneshot` must finish before whatever needs it
+/// starts; `forking` starts a daemon that leaves, the service is up while its control group has
+/// processes.
 #[derive(Deserialize, Default, Clone, Copy, PartialEq, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
     #[default]
     Daemon,
     Oneshot,
+    Forking,
 }
 
 #[derive(Deserialize, Default, Clone, Copy, PartialEq, Debug)]
@@ -52,12 +63,14 @@ pub enum Restart {
     Always,
 }
 
-/// Where what the service prints goes: the console, or `/var/log/orchid/NAME.log`.
+/// Where what the service prints goes: every console, `/var/log/orchid/NAME.log` (rotated), or,
+/// for a service that talks to a person, the console itself as its terminal.
 #[derive(Deserialize, Clone, Copy, PartialEq, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Output {
     Console,
     File,
+    Tty,
 }
 
 #[derive(Clone, Debug)]
@@ -77,6 +90,10 @@ pub struct Service {
     pub output: Output,
     /// Seconds a stopping service gets before it is killed.
     pub timeout: u64,
+    /// Run when the service is stopped, before it is signalled (a oneshot that is done: when it is stopped).
+    pub stop: Vec<String>,
+    /// The boot modes it belongs to: `normal`, `rescue`.
+    pub modes: Vec<String>,
 }
 
 impl Service {
@@ -102,6 +119,8 @@ impl Service {
             env: s.env.into_iter().collect(),
             output,
             timeout: s.timeout.unwrap_or(5),
+            stop: s.stop,
+            modes: s.modes,
         })
     }
 

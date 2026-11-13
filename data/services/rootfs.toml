@@ -1,4 +1,6 @@
 [service]
 description = "mount the root file system read-write, as /etc/fstab says"
 exec = ["/usr/bin/mount", "-o", "remount", "/"]
+needs = ["fsck"]
 type = "oneshot"
+modes = ["normal", "rescue"]

@@ -1,0 +1,5 @@
+[service]
+description = "apply /etc/sysctl.conf and /etc/sysctl.d"
+exec = ["/usr/sbin/sysctl", "--system", "--quiet"]
+needs = ["mounts"]
+type = "oneshot"

@@ -14,6 +14,7 @@ const HELP: &str = "orchid  the init system of asterOS
   list                      the services, their state and whether they start at boot
   status NAME               everything about one service
   start | stop | restart NAME...
+  kill NAME [SIGNAL]        signal every process of a service (default TERM)
   enable | disable NAME...  start at boot, or not
   reload                    read the service files again
   log NAME [LINES]          the end of a service's log (default 20 lines)
@@ -35,7 +36,7 @@ fn main() {
     };
     let code = match words.as_slice() {
         ["list" | "ls"] => ctl::send(&["list"]),
-        ["status", _] | ["start" | "stop" | "restart" | "enable" | "disable", _, ..] | ["reload"] | ["reboot"] | ["poweroff"] | ["halt"] => ctl::send(&words),
+        ["status", _] | ["kill", _] | ["kill", _, _] | ["start" | "stop" | "restart" | "enable" | "disable", _, ..] | ["reload"] | ["reboot"] | ["poweroff"] | ["halt"] => ctl::send(&words),
         ["log", name] => ctl::log(name, 20),
         ["log", name, n] => ctl::log(name, n.parse().unwrap_or(20)),
         ["check", rest @ ..] => check(rest.first().copied().unwrap_or(init::SERVICES)),

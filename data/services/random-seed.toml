@@ -1,0 +1,6 @@
+[service]
+description = "feed the random number generator with what the last shutdown saved, and save new"
+exec = ["/bin/sh", "-c", "[ ! -f /var/lib/orchid/random-seed ] || cat /var/lib/orchid/random-seed > /dev/urandom"]
+stop = ["/bin/sh", "-c", "mkdir -p /var/lib/orchid && umask 077 && head -c 512 /dev/urandom > /var/lib/orchid/random-seed"]
+needs = ["mounts"]
+type = "oneshot"
