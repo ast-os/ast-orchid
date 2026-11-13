@@ -1,6 +1,6 @@
 [service]
-description = "set the system time from the hardware clock, and the other way at shutdown"
-exec = ["/bin/sh", "-c", "[ ! -e /dev/rtc0 ] || hwclock --hctosys --utc"]
-stop = ["/bin/sh", "-c", "[ ! -e /dev/rtc0 ] || hwclock --systohc --utc"]
+description = "set the system time from the hardware clock, and the hardware clock from it at shutdown"
+exec = ["/bin/sh", "-c", "[ ! -r /sys/class/rtc/rtc0/since_epoch ] || date -u -s @$(cat /sys/class/rtc/rtc0/since_epoch) > /dev/null"]
+stop = ["/bin/sh", "-c", "[ ! -e /dev/rtc0 ] || hwclock --systohc --utc || true"]
 after = ["udev-settle"]
 type = "oneshot"

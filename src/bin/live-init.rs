@@ -20,12 +20,29 @@ fn mount(src: &str, dst: &str, fs: &str, flags: u64, data: &str) -> bool {
     unsafe { libc::mount(c(src).as_ptr(), c(dst).as_ptr(), c(fs).as_ptr(), flags, c(data).as_ptr().cast()) == 0 }
 }
 
+/// Text to every console the kernel has (`/sys/class/tty/console/active`), not only the last one
+/// that `/dev/console` is.
+fn show(text: &str) {
+    use std::io::Write;
+    let active = std::fs::read_to_string("/sys/class/tty/console/active").unwrap_or_default();
+    let mut any = false;
+    for name in active.split_whitespace() {
+        if let Ok(mut f) = std::fs::OpenOptions::new().write(true).open(format!("/dev/{name}")) {
+            let _ = f.write_all(text.as_bytes());
+            any = true;
+        }
+    }
+    if !any {
+        print!("{text}");
+    }
+}
+
 fn say(msg: &str) {
-    println!("[#] {msg}");
+    show(&format!("[#] {msg}\n"));
 }
 
 fn die(msg: &str) -> ! {
-    println!("[!] {msg}");
+    show(&format!("[!] {msg}\n"));
     // nothing to fall back on: stay alive so the message can be read
     loop {
         std::thread::sleep(Duration::from_secs(3600));

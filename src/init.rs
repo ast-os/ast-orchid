@@ -215,12 +215,20 @@ struct Supervisor {
 }
 
 pub fn run() -> ! {
+    let signals = SignalFd::new();
+    // the consoles are listed in /sys and opened in /dev, so the file systems come first; what they
+    // have to report is shown after the banner, on every console
+    let mounted = mount_basics();
+    console::open();
     console::banner();
     console::title(&format!("orchid {}", env!("CARGO_PKG_VERSION")));
-    let signals = SignalFd::new();
-    console::open();
-    mount_basics();
-    console::open();
+    for (marker, text) in mounted {
+        if marker == '+' {
+            console::ok(&text);
+        } else {
+            console::warn(&text);
+        }
+    }
     let cg = sys::cgroup::init();
     clean_tmp();
     hostname();
@@ -247,7 +255,8 @@ fn boot_mode() -> &'static str {
     if cmdline.split_whitespace().any(|w| matches!(w, "single" | "rescue" | "orchid.mode=rescue")) { "rescue" } else { "normal" }
 }
 
-fn mount_basics() {
+/// Mount what a running system needs; what to say about it is returned.
+fn mount_basics() -> Vec<(char, String)> {
     const FLAGS: u64 = libc::MS_NOSUID | libc::MS_NODEV | libc::MS_NOEXEC;
     let table: [(&str, &str, &str, u64, &str); 8] = [
         ("proc", "/proc", "proc", FLAGS, ""),
@@ -260,6 +269,7 @@ fn mount_basics() {
         ("tmpfs", "/tmp", "tmpfs", libc::MS_NOSUID | libc::MS_NODEV, "mode=1777"),
     ];
     let mut done = Vec::new();
+    let mut said = Vec::new();
     for (source, target, fstype, flags, data) in table {
         if sys::is_mounted(target) {
             continue;
@@ -269,13 +279,14 @@ fn mount_basics() {
                 done.push(target);
             }
         } else {
-            console::warn(&format!("unable to mount {target}"));
+            said.push(('!', format!("unable to mount {target}")));
         }
     }
     done.sort_by_key(|t| ["/sys", "/dev", "/proc", "/tmp"].iter().position(|x| x == t).unwrap_or(9));
     if !done.is_empty() {
-        console::ok(&format!("mounting {}", done.join(" ")));
+        said.insert(0, ('+', format!("mounting {}", done.join(" "))));
     }
+    said
 }
 
 fn clean_tmp() {
