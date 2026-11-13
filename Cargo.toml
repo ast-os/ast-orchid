@@ -1,0 +1,18 @@
+[package]
+name = "orchid"
+version = "1.0.0"
+edition = "2024"
+license = "BSD-3-Clause"
+repository = "https://github.com/ast-os/ast-orchid"
+
+[dependencies]
+libc = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+toml = "1.2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
