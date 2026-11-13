@@ -26,8 +26,12 @@ orchid check [DIR]               check the service files and show the start orde
 Anyone may `list` and `status`; changing anything needs root. PID 1 also answers signals:
 TERM and INT reboot, USR1 halts, USR2 powers off.
 
-Starting a service starts what it needs first; stopping one stops what needs it first.
-Services that fail to start are reported and the rest of the boot goes on.
+Nothing waits inside PID 1: every service has a state, and a request only changes what is
+wanted. Services whose dependencies are met start together; `orchid` answers while a oneshot is
+still running. `start`, `stop` and `restart` reply when the services they name have settled
+(up or done, or failed, with the reason). Starting a service starts what it needs first; stopping
+one stops what needs it first. A service that cannot start is reported and the rest of the boot
+goes on.
 
 ## Services
 
@@ -39,7 +43,7 @@ One TOML file per service in `/etc/orchid/services`, started at boot when linked
 [service]
 description = "secure shell"
 exec = ["/usr/sbin/sshd", "-D"]
-type = "daemon"                # daemon (default), or oneshot: it must finish before others start
+type = "daemon"                # daemon (default), or oneshot: what needs it waits until it has finished
 needs = ["network"]            # started first; if it fails, this one is skipped
 wants = ["log"]                # started first if it exists, no more
 after = ["clock"]              # only the order

@@ -51,12 +51,26 @@ cat > "$s/lost.toml" <<S
 exec = ["/bin/true"]
 needs = ["nope"]
 S
+cat > "$s/slow.toml" <<S
+[service]
+description = "a oneshot that takes a while"
+exec = ["/bin/sleep", "6"]
+type = "oneshot"
+S
+cat > "$s/late.toml" <<S
+[service]
+description = "needs the slow oneshot"
+exec = ["/bin/sleep", "3600"]
+needs = ["slow"]
+S
 cat > "$s/probe.toml" <<'S'
 [service]
 description = "drives the orchid commands"
 exec = ["/bin/bash", "-c", '''
 exec 2>&1
-sleep 4
+sleep 1
+echo "--- during a oneshot"; orchid list | grep -E '^(slow|late|b) '
+sleep 8
 echo "--- list"; orchid list
 echo "--- status b"; orchid status b
 echo "--- stop b"; orchid stop b; orchid list | grep '^b'
