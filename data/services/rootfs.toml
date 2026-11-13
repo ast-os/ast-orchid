@@ -1,6 +1,6 @@
 [service]
 description = "mount the root file system read-write, when the kernel mounted it read-only"
-exec = ["/bin/sh", "-c", "if findmnt -n -o OPTIONS / | grep -qw ro; then mount -o remount,rw /; fi"]
+exec = ["/bin/sh", "-c", "if findmnt -n -o OPTIONS / | tr , '\\n' | grep -qx ro; then mount -o remount,rw /; fi"]
 needs = ["fsck"]
 type = "oneshot"
 modes = ["normal", "rescue"]
