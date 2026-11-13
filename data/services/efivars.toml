@@ -1,0 +1,4 @@
+[service]
+description = "mount the UEFI variables, when booted from UEFI"
+exec = ["/bin/sh", "-c", "[ ! -d /sys/firmware/efi/efivars ] || mount -t efivarfs efivarfs /sys/firmware/efi/efivars"]
+type = "oneshot"

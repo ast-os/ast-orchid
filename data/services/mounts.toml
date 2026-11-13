@@ -1,0 +1,5 @@
+[service]
+description = "mount the file systems of /etc/fstab"
+exec = ["/usr/bin/mount", "-a"]
+after = ["udev-settle"]
+type = "oneshot"
