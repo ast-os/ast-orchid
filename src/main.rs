@@ -11,15 +11,15 @@ use std::path::Path;
 
 const HELP: &str = "orchid  the init system of asterOS
 
-  list                      the services, their state and whether they start at boot
-  status NAME               everything about one service
-  start | stop | restart NAME...
-  kill NAME [SIGNAL]        signal every process of a service (default TERM)
+  list  the services, their state and whether they start at boot
+  status NAME  everything about one service
+  start | stop | restart NAME...  bring services up, down or both
+  kill NAME [SIGNAL]  signal every process of a service (default TERM)
   enable | disable NAME...  start at boot, or not
-  reload                    read the service files again
-  log NAME [LINES]          the end of a service's log (default 20 lines)
+  reload  read the service files again
+  log NAME [LINES]  the end of a service's log (default 20 lines)
   reboot | poweroff | halt  take the system down
-  check [DIR]               check the service files and show the start order
+  check [DIR]  check the service files and show the start order
   version";
 
 fn main() {
