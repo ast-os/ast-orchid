@@ -38,7 +38,7 @@ fn show(text: &str) {
 }
 
 fn die(msg: &str) -> ! {
-    show(&format!("[!] {msg}\n"));
+    show(&format!("[!]  {msg}\n"));
     // nothing to fall back on: stay alive so the message can be read
     loop {
         std::thread::sleep(Duration::from_secs(3600));

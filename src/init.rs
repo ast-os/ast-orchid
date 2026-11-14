@@ -223,7 +223,7 @@ pub fn run() -> ! {
     console::open();
     console::clear();
     console::banner();
-    console::title(&format!("orchid {}", env!("CARGO_PKG_VERSION")));
+    console::title(&format!("orchid  {}", env!("CARGO_PKG_VERSION")));
     for (marker, text) in mounted {
         if marker == '+' {
             console::ok(&text);
@@ -242,7 +242,7 @@ pub fn run() -> ! {
     }
     let mode = boot_mode();
     if mode != "normal" {
-        console::title(&format!("{mode} mode"));
+        console::title(&format!("mode  {mode}"));
     }
     let mut sup = Supervisor { units: ordered.into_iter().map(Unit::new).collect(), halt: None, waiters: vec![], cg, mode };
     let listener = bind();
@@ -281,12 +281,12 @@ fn mount_basics() -> Vec<(char, String)> {
                 done.push(target);
             }
         } else {
-            said.push(('!', format!("unable to mount {target}")));
+            said.push(('!', format!("unable to mount  {target}")));
         }
     }
     done.sort_by_key(|t| ["/sys", "/dev", "/proc", "/tmp"].iter().position(|x| x == t).unwrap_or(9));
     if !done.is_empty() {
-        said.insert(0, ('+', format!("mounting {}", done.join(" "))));
+        said.insert(0, ('+', format!("mounting  {}", done.join("  "))));
     }
     said
 }
@@ -298,7 +298,7 @@ fn clean_tmp() {
             let _ = if p.is_dir() && !p.is_symlink() { std::fs::remove_dir_all(&p) } else { std::fs::remove_file(&p) };
         }
     }
-    console::ok("cleaning /tmp");
+    console::ok("cleaning  /tmp");
 }
 
 fn hostname() {
@@ -306,7 +306,7 @@ fn hostname() {
         let name = name.trim();
         if !name.is_empty() {
             if sys::set_hostname(name) {
-                console::ok(&format!("hostname {name}"));
+                console::ok(&format!("hostname  {name}"));
             } else {
                 console::warn("unable to set the hostname");
             }
@@ -444,7 +444,7 @@ fn run_stop_hook(svc: &Service) {
                 }
             }
         }
-        Err(e) => console::warn(&format!("{}: cannot run {}: {e}", svc.name, svc.stop[0])),
+        Err(e) => console::warn(&format!("{}  cannot run  {}  {e}", svc.name, svc.stop[0])),
     }
 }
 
@@ -568,7 +568,7 @@ impl Supervisor {
                         Deps::Failed(why) => {
                             let u = &mut self.units[i];
                             u.state = State::Failed;
-                            console::warn(&format!("{} {why}", u.svc.name));
+                            console::warn(&format!("{}  {why}", u.svc.name));
                             u.why = Some(why);
                             changed = true;
                         }
@@ -597,7 +597,7 @@ impl Supervisor {
             Err(e) => {
                 let u = &mut self.units[i];
                 u.state = State::Failed;
-                console::warn(&format!("{} failed: {e}", u.svc.name));
+                console::warn(&format!("{}  failed  {e}", u.svc.name));
                 u.why = Some(e);
                 return;
             }
@@ -610,7 +610,7 @@ impl Supervisor {
         u.why = None;
         if u.svc.kind == Kind::Daemon {
             u.state = State::Up;
-            console::ok(&format!("started {}", u.svc.name));
+            console::ok(&format!("started  {}", u.svc.name));
         } else {
             u.state = State::Starting;
             u.deadline = Some(Instant::now() + ONESHOT_LIMIT);
@@ -652,27 +652,27 @@ impl Supervisor {
         match u.state {
             State::Stopping => {
                 u.state = State::Idle;
-                console::gone(&format!("stopped {name}"));
+                console::gone(&format!("stopped  {name}"));
             }
             State::Starting if code == 0 && u.svc.kind == Kind::Forking => {
                 if cg && !sys::cgroup::populated(&name) {
                     u.state = State::Failed;
                     u.why = Some("left nothing running".into());
-                    console::warn(&format!("{name} left nothing running"));
+                    console::warn(&format!("{name}  left nothing running"));
                 } else {
                     u.state = State::Up;
                     u.since = Some(Instant::now());
-                    console::ok(&format!("started {name}"));
+                    console::ok(&format!("started  {name}"));
                 }
             }
             State::Starting if code == 0 => {
                 u.state = State::Done;
-                console::ok(&format!("ran {name}"));
+                console::ok(&format!("ran  {name}"));
             }
             State::Starting => {
                 u.state = State::Failed;
                 u.why = Some(format!("exit {code}"));
-                console::warn(&format!("{name} failed (exit {code})"));
+                console::warn(&format!("{name}  failed  (exit {code})"));
             }
             _ => self.daemon_died(i, code),
         }
@@ -692,19 +692,19 @@ impl Supervisor {
             Restart::No => false,
         };
         if !again {
-            console::warn(&format!("{} stopped (exit {code})", u.svc.name));
+            console::warn(&format!("{}  stopped  (exit {code})", u.svc.name));
             return;
         }
         let now = Instant::now();
         u.restarts.retain(|t| now.duration_since(*t) < WINDOW);
         if u.restarts.len() >= RESTARTS {
-            console::warn(&format!("{} keeps failing, giving up", u.svc.name));
+            console::warn(&format!("{}  keeps failing, giving up", u.svc.name));
             return;
         }
         u.restarts.push(now);
         u.total_restarts += 1;
         u.restart_at = Some(now + Duration::from_secs(1));
-        console::warn(&format!("{} stopped (exit {code}), restarting", u.svc.name));
+        console::warn(&format!("{}  stopped  (exit {code})  restarting", u.svc.name));
     }
 
     /// What time has to say: restarts that are due, services that do not stop, oneshots that do not
@@ -722,10 +722,10 @@ impl Supervisor {
                 u.deadline = None;
                 if self.cg {
                     sys::cgroup::kill(&name);
-                    console::gone(&format!("killed {name}"));
+                    console::gone(&format!("killed  {name}"));
                 } else if let Some(pid) = u.pid {
                     sys::kill(pid, libc::SIGKILL);
-                    console::gone(&format!("killed {name}"));
+                    console::gone(&format!("killed  {name}"));
                 }
             }
             let u = &self.units[i];
@@ -734,7 +734,7 @@ impl Supervisor {
                     let u = &mut self.units[i];
                     u.state = State::Idle;
                     u.deadline = None;
-                    console::gone(&format!("stopped {name}"));
+                    console::gone(&format!("stopped  {name}"));
                     sys::cgroup::clear(&name);
                 } else {
                     self.daemon_died(i, 1);
@@ -1100,7 +1100,7 @@ fn unmount_all() {
     points.sort_by_key(|p| std::cmp::Reverse(p.len()));
     for p in points.iter().filter(|p| !["/", "/proc", "/sys", "/dev"].contains(&p.as_str())) {
         if sys::umount(p) {
-            console::gone(&format!("unmounted {p}"));
+            console::gone(&format!("unmounted  {p}"));
         }
     }
     // the root stays, read-only, so that nothing is half written

@@ -44,7 +44,7 @@ pub fn write(text: &str) {
 }
 
 fn line(marker: char, text: &str) {
-    write(&format!("[{marker}] {text}\n"));
+    write(&format!("[{marker}]  {text}\n"));
 }
 
 /// Only the errors of the kernel on the screen (the console log level); its warnings and notices
