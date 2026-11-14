@@ -37,10 +37,6 @@ fn show(text: &str) {
     }
 }
 
-fn say(msg: &str) {
-    show(&format!("[#] {msg}\n"));
-}
-
 fn die(msg: &str) -> ! {
     show(&format!("[!] {msg}\n"));
     // nothing to fall back on: stay alive so the message can be read
@@ -124,10 +120,13 @@ fn main() {
     mount("devtmpfs", "/dev", "devtmpfs", 0, "");
     mount("proc", "/proc", "proc", 0, "");
     mount("sysfs", "/sys", "sysfs", 0, "");
-    say("asterOS live");
+    // the kernel's warnings stay off the screen; the boot screen is orchid's
+    // SAFETY: SYSLOG_ACTION_CONSOLE_LEVEL takes the level as its length and no buffer
+    unsafe { libc::syscall(libc::SYS_syslog, 8, std::ptr::null::<u8>(), 3) };
 
-    let Some(dev) = find_medium() else { die("no medium with /live/root.squashfs found") };
-    say(&format!("medium  {dev}"));
+    if find_medium().is_none() {
+        die("no medium with /live/root.squashfs found");
+    }
     let Some(lp) = loop_attach(&format!("{MEDIUM}{SQUASH}")) else { die("cannot set up a loop device") };
     if !mount(&lp, "/ro", "squashfs", libc::MS_RDONLY, "") {
         die("cannot mount the squashfs");

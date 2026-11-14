@@ -47,6 +47,18 @@ fn line(marker: char, text: &str) {
     write(&format!("[{marker}] {text}\n"));
 }
 
+/// Only the errors of the kernel on the screen (the console log level); its warnings and notices
+/// are in `dmesg`.
+pub fn quiet_kernel() {
+    // SAFETY: SYSLOG_ACTION_CONSOLE_LEVEL takes the level as its length and no buffer
+    unsafe { libc::syscall(libc::SYS_syslog, 8, std::ptr::null::<u8>(), 3) };
+}
+
+/// Empty the screens (and the scrollback) of what the kernel and the initramfs wrote.
+pub fn clear() {
+    write("\x1b[H\x1b[2J\x1b[3J");
+}
+
 pub fn banner() {
     write(&format!("{BANNER}\n"));
 }

@@ -219,7 +219,9 @@ pub fn run() -> ! {
     // the consoles are listed in /sys and opened in /dev, so the file systems come first; what they
     // have to report is shown after the banner, on every console
     let mounted = mount_basics();
+    console::quiet_kernel();
     console::open();
+    console::clear();
     console::banner();
     console::title(&format!("orchid {}", env!("CARGO_PKG_VERSION")));
     for (marker, text) in mounted {
